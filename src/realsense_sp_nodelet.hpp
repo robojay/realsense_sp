@@ -67,6 +67,7 @@ namespace realsense_sp
 {
 typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::CameraInfo, sensor_msgs::CameraInfo> camInfoSyncer;
 typedef message_filters::TimeSynchronizer<sensor_msgs::Image, realsense_camera::SamplingData> imageSamplingSyncer;
+double map_resolution = 0.05;  // added for modified occupancy map code
 
 class slam_tracking_event_handler : public rs::slam::tracking_event_handler
 {
@@ -96,6 +97,7 @@ public:
   tf::TransformBroadcaster br;
   tf::Transform transform;
   std::shared_ptr<rs::slam::occupancy_map> occ_map;
+  IplImage * ipNavMap = NULL;    // added for modified occupancy map code
   std::string camera_frame_id_;
   std::string origin_frame_id_;
   geometry_msgs::Pose previousPose;
@@ -108,7 +110,7 @@ public:
     
     n.param("camera_frame_id", camera_frame_id_, std::string("camera_link"));
     n.param("origin_frame_id", origin_frame_id_, std::string("base_link"));
-    //occPublisher = n.advertise<nav_msgs::OccupancyGrid>("/map",1);  
+    occPublisher = n.advertise<nav_msgs::OccupancyGrid>("/map",1);  
   }
   void module_output_ready(rs::core::video_module_interface *sender, rs::core::correlated_sample_set *sample);
 

@@ -45,11 +45,11 @@ void slam_event_handler::module_output_ready(rs::core::video_module_interface *s
 {
   auto slam = dynamic_cast<rs::slam::slam *>(sender);
 
-  if (!occ_map)
-  {
-    // This will only happen on the first execution of this callback.
-    occ_map = slam->create_occupancy_map(50 * 50);
-  }
+  //if (!occ_map)
+  //{
+  //  // This will only happen on the first execution of this callback.
+  //  occ_map = slam->create_occupancy_map(50 * 50);
+  //}
 
   // Get the camera pose
   rs::slam::PoseMatrix4f pose;
@@ -186,6 +186,57 @@ void slam_event_handler::module_output_ready(rs::core::video_module_interface *s
   }
     cv::waitKey(1);
   */
+
+  // Copied code from 
+  // https://github.com/IntelRealSense/realsense_samples_ros/blob/kinetic-devel/realsense_ros_slam/src/slam_nodelet.cpp
+  //
+  // 
+  // == FROM HERE ==
+
+    // Publish occupancy map
+    int wmap = 512;
+    int hmap = 512;
+    if (!occ_map)
+    {
+      occ_map = slam->create_occupancy_map(wmap * hmap);
+      std::cout << " creating occupancy map: resolution: " << slam->get_occupancy_map_resolution() << std::endl;
+    }
+    if (ipNavMap == NULL)
+    {
+      ipNavMap = cvCreateImage(cvSize(wmap, hmap), 8, 1);
+      cvSet(ipNavMap, 10, NULL);
+    }
+    int status = slam->get_occupancy_map_update(occ_map);
+    int count = occ_map->get_tile_count();
+    nav_msgs::OccupancyGrid map_msg;
+    if (status >= 0 && count > 0)
+    {
+      const int32_t* map = occ_map->get_tile_coordinates();
+      for (int i = 0; i < count; i++)
+      {
+        int _x = map[3 * i] + wmap / 2;
+        int _y = map[3 * i + 1] + hmap / 2;
+        if (_x >= 0 && _x < wmap)
+        {
+          if (_y >= 0 && _y < hmap)
+          {
+            int V = map[3 * i + 2];
+            ipNavMap->imageData[wmap * _y + _x] = V;
+          }
+        }
+      }
+    }
+    std::vector<signed char> vMap(ipNavMap->imageData, ipNavMap->imageData + wmap * hmap);
+    map_msg.data = vMap;
+    map_msg.info.resolution = map_resolution;
+    map_msg.info.width      = wmap;
+    map_msg.info.height     = hmap;
+    map_msg.info.origin.position.x = -(wmap / 2) * map_resolution;
+    map_msg.info.origin.position.y = -(hmap / 2) * map_resolution;
+    occPublisher.publish(map_msg);  // modified from original
+
+  // == TO HERE ==
+
 }
 SPNodelet::SPNodelet()
 {
@@ -207,6 +258,7 @@ SPNodelet::~SPNodelet()
  
 void SPNodelet::onInit()
 {
+  ROS_INFO("Initializing...");
   ready_ = false;
   actual_config = {};
   memcpy(actual_config.device_info.name, "Intel RealSense ZR300", std::strlen("Intel RealSense ZR300"));
@@ -455,7 +507,7 @@ void SPNodelet::initializeSlam()
     ROS_INFO("Relocalization - enabled");
 
   }
-  slam_->set_occupancy_map_resolution(0.05);
+  slam_->set_occupancy_map_resolution(map_resolution);  // now a variable, but set in .hpp file
   slam_->register_event_handler(scenePerceptionEventHandler);
   slam_->register_tracking_event_handler(&trackingEventHandler);
 
