@@ -232,7 +232,9 @@ void slam_event_handler::module_output_ready(rs::core::video_module_interface *s
     map_msg.info.width      = wmap;
     map_msg.info.height     = hmap;
     map_msg.info.origin.position.x = -(wmap / 2) * map_resolution;
-    map_msg.info.origin.position.y = -(hmap / 2) * map_resolution;
+    map_msg.header.stamp = ros::Time(1000);//timestamp_ms / 1000);
+    map_msg.header.frame_id = "/map";
+    
     occPublisher.publish(map_msg);  // modified from original
 
   // == TO HERE ==
