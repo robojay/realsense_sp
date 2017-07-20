@@ -67,7 +67,7 @@ namespace realsense_sp
 {
 typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::CameraInfo, sensor_msgs::CameraInfo> camInfoSyncer;
 typedef message_filters::TimeSynchronizer<sensor_msgs::Image, realsense_camera::SamplingData> imageSamplingSyncer;
-double map_resolution = 0.05;  // added for modified occupancy map code
+double map_resolution = 0.02;  // added for modified occupancy map code christiaan: change from 0.05 to 0.02
 
 class slam_tracking_event_handler : public rs::slam::tracking_event_handler
 {
@@ -91,9 +91,11 @@ class slam_event_handler : public rs::core::video_module_interface::processing_e
 public:
   ros::NodeHandle nodeHandle_;
   ros::Publisher odomPublisher;
+  ros::Publisher relocPublisher; //christiaan: added to look at the relocation pose
   ros::Publisher statusPublisher;;
   ros::Publisher occPublisher;
-  
+  ros::Rate      loopRate;  //christiaan: added to limit the frequency of messages to not overload the Euclid
+
   tf::TransformBroadcaster br;
   tf::Transform transform;
   std::shared_ptr<rs::slam::occupancy_map> occ_map;
@@ -102,7 +104,7 @@ public:
   std::string origin_frame_id_;
   geometry_msgs::Pose previousPose;
   ros::Time previousTimestamp = ros::Time(0);
-  slam_event_handler(ros::NodeHandle &n) : nodeHandle_(n)
+  slam_event_handler(ros::NodeHandle &n) : nodeHandle_(n), loopRate(10)
   {
     std::cout << "created.........." << std::endl;
     odomPublisher = n.advertise<nav_msgs::Odometry>("/realsense/odom",1);  
@@ -111,6 +113,8 @@ public:
     n.param("camera_frame_id", camera_frame_id_, std::string("camera_link"));
     n.param("origin_frame_id", origin_frame_id_, std::string("base_link"));
     occPublisher = n.advertise<nav_msgs::OccupancyGrid>("/map",1);  
+    
+    relocPublisher = n.advertise<nav_msgs::Odometry>("/relocation",1);
   }
   void module_output_ready(rs::core::video_module_interface *sender, rs::core::correlated_sample_set *sample);
 
