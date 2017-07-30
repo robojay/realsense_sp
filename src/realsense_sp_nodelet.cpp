@@ -37,13 +37,14 @@ PLUGINLIB_EXPORT_CLASS(realsense_sp::SPNodelet, nodelet::Nodelet)
 
 namespace realsense_sp
 {
+
 /*
    * Nodelet constructor.
    */
- 
+
 void slam_event_handler::module_output_ready(rs::core::video_module_interface *sender, rs::core::correlated_sample_set *sample)
 {
-  auto slam = dynamic_cast<rs::slam::slam *>(sender);
+  auto slam = dynamic_cast<rs::slam::slam *>(sender); //Docs: https://software.intel.com/sites/products/realsense/slam/classrs_1_1slam_1_1slam.html#details
 
   //if (!occ_map)
   //{
@@ -52,7 +53,7 @@ void slam_event_handler::module_output_ready(rs::core::video_module_interface *s
   //}
 
   // Get the camera pose
-  rs::slam::PoseMatrix4f pose;
+  rs::slam::PoseMatrix4f pose; //documentation https://software.intel.com/sites/products/realsense/slam/classrs_1_1slam_1_1PoseMatrix4f.html
 
   slam->get_camera_pose(pose);
   std::string trackingAccuracy;
@@ -80,9 +81,9 @@ void slam_event_handler::module_output_ready(rs::core::video_module_interface *s
   msg.header.frame_id = "/odom";
   msg.header.stamp = ros::Time::now();
   msg.child_frame_id = camera_frame_id_;
-  msg.pose.pose.position.x = pose.m_data[11];
-  msg.pose.pose.position.y = -pose.m_data[3];
-  msg.pose.pose.position.z = -pose.m_data[7];
+  msg.pose.pose.position.x = pose.m_data[11]; //In documentation this is suppose to be the Z translation https://software.intel.com/sites/products/realsense/slam/classrs_1_1slam_1_1PoseMatrix4f.html 
+  msg.pose.pose.position.y = -pose.m_data[3]; //In documentation this is suppose to be the X translation
+  msg.pose.pose.position.z = -pose.m_data[7]; //In documentation this is suppose to be the Y  translation
   tf::Matrix3x3 mat(pose.m_data[0], pose.m_data[1], pose.m_data[2], pose.m_data[4], pose.m_data[5], pose.m_data[6], pose.m_data[8], pose.m_data[9], pose.m_data[10]);
   tf::Quaternion q;
 
@@ -103,6 +104,8 @@ void slam_event_handler::module_output_ready(rs::core::video_module_interface *s
     ros::Duration diff = msg.header.stamp - previousTimestamp;
     double seconds =  diff.toSec();
     tf::Quaternion diffAngle = tf::Quaternion(previousPose.orientation.x,previousPose.orientation.y,previousPose.orientation.z,previousPose.orientation.w) * tf::Quaternion(msg.pose.pose.orientation.x,msg.pose.pose.orientation.y,msg.pose.pose.orientation.z,msg.pose.pose.orientation.w).inverse();
+
+    // std::cout << "frequency of sending msg on /odom is " << 1/seconds << " Hz" << std::endl;     
 
     msg.twist.twist.linear.x = (previousPose.position.x-msg.pose.pose.position.x)/seconds;
     msg.twist.twist.linear.y = (previousPose.position.y-msg.pose.pose.position.y)/seconds;
@@ -125,7 +128,7 @@ void slam_event_handler::module_output_ready(rs::core::video_module_interface *s
   geometry_msgs::TransformStamped odom_trans;
   odom_trans.header.stamp = msg.header.stamp;
   odom_trans.header.frame_id = "odom";
-  odom_trans.child_frame_id = "base_link";
+  odom_trans.child_frame_id = "camera_link"; //christiaan: changed base_link to camera_link
   odom_trans.transform.translation.x = msg.pose.pose.position.x;
   odom_trans.transform.translation.y = msg.pose.pose.position.y;
   odom_trans.transform.translation.z = msg.pose.pose.position.z;
@@ -134,9 +137,50 @@ void slam_event_handler::module_output_ready(rs::core::video_module_interface *s
   
   br.sendTransform(odom_trans);
   
-  
-
   odomPublisher.publish(msg);
+   
+  //christiaan: added new Transform to tf that shows the transform from between odom and the relocation pose
+
+  // rs::slam::PoseMatrix4f relocPose(1.0,2.0,3.0,4.0,5.0,6.0,7.0,8.0,9.0,10.0,11.0,12.0); 
+  rs::slam::PoseMatrix4f relocPose; 
+
+  bool relocated = false;
+  relocated = slam->get_relocalization_pose(relocPose);
+  //slam->get_relocalization_pose(relocPose);
+
+  if(relocated)
+  {
+    std::cout << "relocation happend" << std::endl;
+
+  geometry_msgs::TransformStamped reloc_trans;
+  reloc_trans.header.stamp = ros::Time::now();
+  reloc_trans.header.frame_id = "odom";
+  reloc_trans.child_frame_id = "reloc"; //christiaan: changed base_link to camera_link
+
+  reloc_trans.transform.translation.x = relocPose.m_data[11];  
+  reloc_trans.transform.translation.y = -relocPose.m_data[3]; //In documentation this is suppose to be the X translation
+  reloc_trans.transform.translation.z = -relocPose.m_data[7]; //In documentation this is suppose to be the Y  translation
+  tf::Matrix3x3 relocMat(relocPose.m_data[0], relocPose.m_data[1], relocPose.m_data[2], relocPose.m_data[4], relocPose.m_data[5], relocPose.m_data[6], relocPose.m_data[8], relocPose.m_data[9], relocPose.m_data[10]);
+  tf::Quaternion relocQ;
+
+  relocMat.getRotation(relocQ);
+  reloc_trans.transform.rotation.x = relocQ.z();
+  reloc_trans.transform.rotation.y = -relocQ.x();
+  reloc_trans.transform.rotation.z = -relocQ.y();
+  reloc_trans.transform.rotation.w = relocQ.w();
+
+  br.sendTransform(reloc_trans);
+
+  std::cout << " m_data[0]  "  << relocPose.m_data[0] << " m_data[1], " <<  relocPose.m_data[1] 
+       << " m_data[2], "  << relocPose.m_data[2] << " m_data[3], " <<  relocPose.m_data[3]  << " m_data[4], " <<  relocPose.m_data[4] 
+       << " m_data[5], "  << relocPose.m_data[5] << " m_data[6], " <<  relocPose.m_data[6]  << " m_data[7], " <<  relocPose.m_data[7]
+       << " m_data[8], "  << relocPose.m_data[8] << " m_data[9], " <<  relocPose.m_data[9]
+       << " m_data[10], " << relocPose.m_data[10] << " m_data[11], " << relocPose.m_data[11]
+       << std::endl;
+
+  }
+
+  //christiaan: end addition of relocation tf transform
 
   realsense_sp::Status statusMsg;
   statusMsg.status = trackingAccuracy;
@@ -211,6 +255,7 @@ void slam_event_handler::module_output_ready(rs::core::video_module_interface *s
     nav_msgs::OccupancyGrid map_msg;
     if (status >= 0 && count > 0)
     {
+
       const int32_t* map = occ_map->get_tile_coordinates();
       for (int i = 0; i < count; i++)
       {
@@ -232,18 +277,42 @@ void slam_event_handler::module_output_ready(rs::core::video_module_interface *s
     map_msg.info.width      = wmap;
     map_msg.info.height     = hmap;
     map_msg.info.origin.position.x = -(wmap / 2) * map_resolution;
-    map_msg.info.origin.position.y = -(hmap / 2) * map_resolution;
+    //christiaan: added stamp and frame_id to map msg
+    map_msg.header.stamp = ros::Time::now();
+    map_msg.header.frame_id = "/map";         
+    
+    //christiaan: added a tf transform link from map to odom like the link between odom and camera_link
+    geometry_msgs::TransformStamped map_trans;
+    map_trans.header.stamp = map_msg.header.stamp;
+    map_trans.header.frame_id = "map";
+    map_trans.child_frame_id = "odom"; 
+    map_trans.transform.translation.x = 0;
+    map_trans.transform.translation.y = 0;
+    map_trans.transform.translation.z = 0;
+    map_trans.transform.rotation.x = 0;
+    map_trans.transform.rotation.y = 0;
+    map_trans.transform.rotation.z = 0;
+    map_trans.transform.rotation.w = 1;
+
+
+    br.sendTransform(map_trans);
+
+    //end added by christiaan
+
+
     occPublisher.publish(map_msg);  // modified from original
 
   // == TO HERE ==
+
+    loopRate.sleep();
 
 }
 SPNodelet::SPNodelet()
 {
 
-  resetClient = nh_.advertiseService("/realsense/slam/reset",&SPNodelet::reset,this);
-}
+resetClient = nh_.advertiseService("/realsense/slam/reset",&SPNodelet::reset,this);
 
+}
 /*
    * Nodelet destructor.
    */
@@ -519,6 +588,45 @@ void SPNodelet::initializeSlam()
   }
   ROS_INFO("Done initializing slam nodelet");
 
+  //christiaan: added code to view standard slam parameters
+	
+  //christiaan: set the height of interest (numbers are meter in reference to the center of euclid)
+
+  float minHeight;
+  float maxHeight;
+
+  slam_->get_occupancy_map_height_of_interest(minHeight,maxHeight);
+
+  std::cout << "default height of interest min: " << minHeight << " max: " << maxHeight << std::endl;
+
+  slam_->set_occupancy_map_height_of_interest(-0.1,0.1);
+
+  slam_->get_occupancy_map_height_of_interest(minHeight,maxHeight);
+
+  std::cout << "custom height of interest min: " << minHeight << " max: " << maxHeight << std::endl;
+  
+  //christiaan: set the depth of interest (numbers are meter in reference to the front  of euclid)
+
+  float minDepth;
+  float maxDepth;
+
+  slam_->get_occupancy_map_depth_of_interest(minDepth,maxDepth);
+
+  std::cout << "default depth of interest min: " << minDepth << " max: " << maxDepth << std::endl;
+
+  slam_->set_occupancy_map_depth_of_interest(0.2,1.5); //christiaan: 0.2 m is below the minimum range of 0.55m or the ZR300 camera
+
+  slam_->get_occupancy_map_depth_of_interest(minDepth,maxDepth);
+
+  std::cout << "custom depth of interest max: " << minDepth << " max: " << maxDepth << std::endl;
+
+  //christiaan: set the resolution of the map (numbers are meter)
+
+  std::cout << "default map resolution: " << slam_->get_occupancy_map_resolution() << std::endl;
+
+ // slam_->set_occupancy_map_resolution(0.02);
+
+//  std::cout << "custom map resolution: " << slam_->get_occupancy_map_resolution() << std::endl; 
 }
 /*
    * Callback for Camera Info Topics.
