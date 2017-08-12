@@ -1,0 +1,10 @@
+enable_relocalization: true
+map_resolution: 0.2
+map_width: 1024
+map_height: 1024
+relocalization_map_filename: "~/relocalization.map"
+occupancy_map_filename: "~/occupancy.map"
+depth_of_interest_min: 0.3
+depth_of_interest_max: 3.0
+height_of_interest_min: -0.1
+height_of_interest_max: 0.1

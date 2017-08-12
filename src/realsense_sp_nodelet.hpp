@@ -67,7 +67,6 @@ namespace realsense_sp
 {
 typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::CameraInfo, sensor_msgs::CameraInfo> camInfoSyncer;
 typedef message_filters::TimeSynchronizer<sensor_msgs::Image, realsense_camera::SamplingData> imageSamplingSyncer;
-double map_resolution = 0.02;  // added for modified occupancy map code christiaan: change from 0.05 to 0.02
 
 class slam_tracking_event_handler : public rs::slam::tracking_event_handler
 {
@@ -147,8 +146,31 @@ protected:
   ros::Subscriber imu_sub_;
   std::shared_ptr<message_filters::Subscriber<sensor_msgs::Image>>  fisheye_sub_, depth_sub_;
   std::shared_ptr<message_filters::Subscriber<realsense_camera::SamplingData>>  fisheye_sampling_sub_, depth_sampling_sub_;
-  bool enable_relocalization_;
   bool ready_;
+
+  // parameters
+  bool enable_relocalization_;
+  double map_resolution_;
+  int map_width_;
+  int map_height_;
+  string relocalization_map_filename_;
+  string occupancy_map_filename_;
+  float depth_of_interest_min_;
+  float depth_of_interest_max_;
+  float height_of_interest_min_;
+  float height_of_interest_max_;
+
+
+  const bool Default_enable_relocalization_ = true;
+  const double Default_map_resolution_ = 0.2;
+  const int Default_map_width_ = 1024;
+  const int Default_map_height_ = 1024;
+  const string Default_relocalization_map_filename_ = "~/relocalization.map";
+  const string Default_occupancy_map_filename_ = "~/occupancy.map";
+  const float Default_depth_of_interest_min_ = 0.3;
+  const float Default_depth_of_interest_max_ = 3.0;
+  const float Default_height_of_interest_min_ = -0.1;
+  const float Default_height_of_interest_max_ = 0.1;
 
 
   std::shared_ptr<message_filters::TimeSynchronizer<sensor_msgs::Image, realsense_camera::SamplingData>> fisheye_sync_;

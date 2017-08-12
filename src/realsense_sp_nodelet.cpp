@@ -238,8 +238,8 @@ void slam_event_handler::module_output_ready(rs::core::video_module_interface *s
   // == FROM HERE ==
 
     // Publish occupancy map
-    int wmap = 512;
-    int hmap = 512;
+    int wmap = map_width_;
+    int hmap = map_height_;
     if (!occ_map)
     {
       occ_map = slam->create_occupancy_map(wmap * hmap);
@@ -273,10 +273,10 @@ void slam_event_handler::module_output_ready(rs::core::video_module_interface *s
     }
     std::vector<signed char> vMap(ipNavMap->imageData, ipNavMap->imageData + wmap * hmap);
     map_msg.data = vMap;
-    map_msg.info.resolution = map_resolution;
+    map_msg.info.resolution = map_resolution_;
     map_msg.info.width      = wmap;
     map_msg.info.height     = hmap;
-    map_msg.info.origin.position.x = -(wmap / 2) * map_resolution;
+    map_msg.info.origin.position.x = -(wmap / 2) * map_resolution_;
     //christiaan: added stamp and frame_id to map msg
     map_msg.header.stamp = ros::Time::now();
     map_msg.header.frame_id = "/map";         
@@ -556,14 +556,36 @@ void SPNodelet::initializeIMUIntrinsicData(realsense_camera::IMUInfo &imu_res, r
 }
 void SPNodelet::getParameters() {
   
+    ROS_INFO("Loading Parameters");
+
     nodelet_name_ = getName();
     nh_ = getNodeHandle();
     pnh_ = getPrivateNodeHandle();
    
-    pnh_.param("enable_relocalization", enable_relocalization_, true);
-    
-  
+    pnh_.param("enable_relocalization", enable_relocalization_, Default_enable_relocalization_);
+    pnh_.param("map_resolution", map_resolution_, Default_map_resolution_);
+    pnh_.param("map_width", map_width_, Default_map_width_);
+    pnh_.param("map_height", map_height_, Default_map_height_);
+    pnh_.param("relocalization_map_filename", relocalization_map_filename_, Default_relocalization_map_filename_);
+    pnh_.param("occupancy_map_filename", occupancy_map_filename_, Default_occupancy_map_filename_);
+    pnh_.param("depth_of_interest_min", depth_of_interest_min_, Default_depth_of_interest_min_);
+    pnh_.param("depth_of_interest_max", depth_of_interest_max_, Default_depth_of_interest_max_);
+    pnh_.param("height_of_interest_min", height_of_interest_min_, Default_height_of_interest_min_);
+    pnh_.param("height_of_interest_max", height_of_interest_max_, Default_height_of_interest_max_);
+
+    ROS_INFO("enable_relocalization = " + (enable_relocalization_ ? "true" : "false"));
+    ROS_INFO("map_resolution = " + to_string(map_resolution_));
+    ROS_INFO("map_width = " + to_string(map_width_));
+    ROS_INFO("map_height = " + to_string(map_height_));
+    ROS_INFO("relocalization_map_filename = " + to_string(relocalization_map_filename_));
+    ROS_INFO("occupancy_map_filename = " + to_string(occupancy_map_filename_));
+    ROS_INFO("depth_of_interest_min = " + to_string(depth_of_interest_min_));
+    ROS_INFO("depth_of_interest_max = " + to_string(depth_of_interest_max_));
+    ROS_INFO("height_of_interest_min = " + to_string(height_of_interest_min_));
+    ROS_INFO("height_of_interest_max = " + to_string(height_of_interest_max_));
+
 }
+
 void SPNodelet::initializeSlam()
 {
 
@@ -576,7 +598,7 @@ void SPNodelet::initializeSlam()
     ROS_INFO("Relocalization - enabled");
 
   }
-  slam_->set_occupancy_map_resolution(map_resolution);  // now a variable, but set in .hpp file
+  slam_->set_occupancy_map_resolution(map_resolution_);
   slam_->register_event_handler(scenePerceptionEventHandler);
   slam_->register_tracking_event_handler(&trackingEventHandler);
 
@@ -589,8 +611,7 @@ void SPNodelet::initializeSlam()
   ROS_INFO("Done initializing slam nodelet");
 
   //christiaan: added code to view standard slam parameters
-	
-  //christiaan: set the height of interest (numbers are meter in reference to the center of euclid)
+	//christiaan: set the height of interest (numbers are meter in reference to the center of euclid)
 
   float minHeight;
   float maxHeight;
@@ -599,7 +620,7 @@ void SPNodelet::initializeSlam()
 
   std::cout << "default height of interest min: " << minHeight << " max: " << maxHeight << std::endl;
 
-  slam_->set_occupancy_map_height_of_interest(-0.1,0.1);
+  slam_->set_occupancy_map_height_of_interest(height_of_interest_min_, height_of_interest_max_);
 
   slam_->get_occupancy_map_height_of_interest(minHeight,maxHeight);
 
@@ -614,7 +635,7 @@ void SPNodelet::initializeSlam()
 
   std::cout << "default depth of interest min: " << minDepth << " max: " << maxDepth << std::endl;
 
-  slam_->set_occupancy_map_depth_of_interest(0.2,1.5); //christiaan: 0.2 m is below the minimum range of 0.55m or the ZR300 camera
+  slam_->set_occupancy_map_depth_of_interest(depth_of_interest_min_, depth_of_interest_max_);
 
   slam_->get_occupancy_map_depth_of_interest(minDepth,maxDepth);
 
