@@ -32,8 +32,6 @@
 #include <chrono>
 #include <librealsense/slam/slam_utils.h>
 
-using namespace std;
-
 PLUGINLIB_EXPORT_CLASS(realsense_sp::SPNodelet, nodelet::Nodelet)
 
 namespace realsense_sp
@@ -565,8 +563,6 @@ void SPNodelet::getParameters() {
    
     pnh_.param("enable_relocalization", enable_relocalization_, Default_enable_relocalization_);
     pnh_.param("map_resolution", map_resolution_, Default_map_resolution_);
-    pnh_.param("map_width", map_width_, Default_map_width_);
-    pnh_.param("map_height", map_height_, Default_map_height_);
     pnh_.param("relocalization_map_filename", relocalization_map_filename_, Default_relocalization_map_filename_);
     pnh_.param("occupancy_map_filename", occupancy_map_filename_, Default_occupancy_map_filename_);
     pnh_.param("depth_of_interest_min", depth_of_interest_min_, Default_depth_of_interest_min_);
@@ -574,10 +570,8 @@ void SPNodelet::getParameters() {
     pnh_.param("height_of_interest_min", height_of_interest_min_, Default_height_of_interest_min_);
     pnh_.param("height_of_interest_max", height_of_interest_max_, Default_height_of_interest_max_);
 
-    ROS_INFO("enable_relocalization = " + (enable_relocalization_ ? "true" : "false"));
+    ROS_INFO("enable_relocalization = " + (enable_relocalization_ ? std::string("true") : std::string("false")));
     ROS_INFO("map_resolution = " + to_string(map_resolution_));
-    ROS_INFO("map_width = " + to_string(map_width_));
-    ROS_INFO("map_height = " + to_string(map_height_));
     ROS_INFO("relocalization_map_filename = " + to_string(relocalization_map_filename_));
     ROS_INFO("occupancy_map_filename = " + to_string(occupancy_map_filename_));
     ROS_INFO("depth_of_interest_min = " + to_string(depth_of_interest_min_));

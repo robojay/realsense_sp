@@ -99,18 +99,37 @@ public:
   tf::Transform transform;
   std::shared_ptr<rs::slam::occupancy_map> occ_map;
   IplImage * ipNavMap = NULL;    // added for modified occupancy map code
-  std::string camera_frame_id_;
-  std::string origin_frame_id_;
   geometry_msgs::Pose previousPose;
   ros::Time previousTimestamp = ros::Time(0);
+
+  std::string camera_frame_id_;
+  std::string origin_frame_id_;
+  int map_width_;
+  int map_height_;
+
+  const std::string Default_camera_frame_id_ = "camera_link";
+  const std::string Default_origin_frame_id_ = "base_link";
+  const int Default_map_width_ = 1024;
+  const int Default_map_height_ = 1024;
+
   slam_event_handler(ros::NodeHandle &n) : nodeHandle_(n), loopRate(10)
   {
     std::cout << "created.........." << std::endl;
     odomPublisher = n.advertise<nav_msgs::Odometry>("/realsense/odom",1);  
     statusPublisher = n.advertise<realsense_sp::Status>("/realsense/slam/status",1);  
     
-    n.param("camera_frame_id", camera_frame_id_, std::string("camera_link"));
-    n.param("origin_frame_id", origin_frame_id_, std::string("base_link"));
+    ROS_INFO("Loading Parameters");
+
+    n.param("camera_frame_id", camera_frame_id_, Default_camera_frame_id_);
+    n.param("origin_frame_id", origin_frame_id_, Default_origin_frame_id_);
+    n.param("map_width", map_width_, Default_map_width_);
+    n.param("map_height", map_height_, Default_map_height_);
+
+    ROS_INFO("camera_frame_id = " + camera_frame_id_);
+    ROS_INFO("origin_frame_id = " + origin_frame_id_);
+    ROS_INFO("map_width = " + to_string(map_width_));
+    ROS_INFO("map_height = " + to_string(map_height_));
+
     occPublisher = n.advertise<nav_msgs::OccupancyGrid>("/map",1);  
     
     relocPublisher = n.advertise<nav_msgs::Odometry>("/relocation",1);
@@ -151,10 +170,8 @@ protected:
   // parameters
   bool enable_relocalization_;
   double map_resolution_;
-  int map_width_;
-  int map_height_;
-  string relocalization_map_filename_;
-  string occupancy_map_filename_;
+  std::string relocalization_map_filename_;
+  std::string occupancy_map_filename_;
   float depth_of_interest_min_;
   float depth_of_interest_max_;
   float height_of_interest_min_;
@@ -163,10 +180,8 @@ protected:
 
   const bool Default_enable_relocalization_ = true;
   const double Default_map_resolution_ = 0.2;
-  const int Default_map_width_ = 1024;
-  const int Default_map_height_ = 1024;
-  const string Default_relocalization_map_filename_ = "~/relocalization.map";
-  const string Default_occupancy_map_filename_ = "~/occupancy.map";
+  const std::string Default_relocalization_map_filename_ = "~/relocalization.map";
+  const std::string Default_occupancy_map_filename_ = "~/occupancy.map";
   const float Default_depth_of_interest_min_ = 0.3;
   const float Default_depth_of_interest_max_ = 3.0;
   const float Default_height_of_interest_min_ = -0.1;
