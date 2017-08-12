@@ -32,6 +32,7 @@
 #include <chrono>
 #include <librealsense/slam/slam_utils.h>
 
+using namespace std;
 
 PLUGINLIB_EXPORT_CLASS(realsense_sp::SPNodelet, nodelet::Nodelet)
 
