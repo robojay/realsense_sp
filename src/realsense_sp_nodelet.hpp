@@ -125,10 +125,10 @@ public:
     n.param("map_width", map_width_, Default_map_width_);
     n.param("map_height", map_height_, Default_map_height_);
 
-    ROS_INFO("camera_frame_id = " + camera_frame_id_);
-    ROS_INFO("origin_frame_id = " + origin_frame_id_);
-    ROS_INFO("map_width = " + to_string(map_width_));
-    ROS_INFO("map_height = " + to_string(map_height_));
+    ROS_INFO_STREAM("camera_frame_id = " << camera_frame_id_);
+    ROS_INFO_STREAM("origin_frame_id = " << origin_frame_id_);
+    ROS_INFO_STREAM("map_width = " << map_width_);
+    ROS_INFO_STREAM("map_height = " << map_height_);
 
     occPublisher = n.advertise<nav_msgs::OccupancyGrid>("/map",1);  
     

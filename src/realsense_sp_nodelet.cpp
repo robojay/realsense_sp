@@ -272,10 +272,10 @@ void slam_event_handler::module_output_ready(rs::core::video_module_interface *s
     }
     std::vector<signed char> vMap(ipNavMap->imageData, ipNavMap->imageData + wmap * hmap);
     map_msg.data = vMap;
-    map_msg.info.resolution = map_resolution_;
+    map_msg.info.resolution = slam->get_occupancy_map_resolution();
     map_msg.info.width      = wmap;
     map_msg.info.height     = hmap;
-    map_msg.info.origin.position.x = -(wmap / 2) * map_resolution_;
+    map_msg.info.origin.position.x = -(wmap / 2) * slam->get_occupancy_map_resolution();
     //christiaan: added stamp and frame_id to map msg
     map_msg.header.stamp = ros::Time::now();
     map_msg.header.frame_id = "/map";         
@@ -570,14 +570,14 @@ void SPNodelet::getParameters() {
     pnh_.param("height_of_interest_min", height_of_interest_min_, Default_height_of_interest_min_);
     pnh_.param("height_of_interest_max", height_of_interest_max_, Default_height_of_interest_max_);
 
-    ROS_INFO("enable_relocalization = " + (enable_relocalization_ ? std::string("true") : std::string("false")));
-    ROS_INFO("map_resolution = " + to_string(map_resolution_));
-    ROS_INFO("relocalization_map_filename = " + to_string(relocalization_map_filename_));
-    ROS_INFO("occupancy_map_filename = " + to_string(occupancy_map_filename_));
-    ROS_INFO("depth_of_interest_min = " + to_string(depth_of_interest_min_));
-    ROS_INFO("depth_of_interest_max = " + to_string(depth_of_interest_max_));
-    ROS_INFO("height_of_interest_min = " + to_string(height_of_interest_min_));
-    ROS_INFO("height_of_interest_max = " + to_string(height_of_interest_max_));
+    ROS_INFO_STREAM("enable_relocalization = " << (enable_relocalization_ ? std::string("true") : std::string("false")));
+    ROS_INFO_STREAM("map_resolution = " << map_resolution_);
+    ROS_INFO_STREAM("relocalization_map_filename = " << relocalization_map_filename_);
+    ROS_INFO_STREAM("occupancy_map_filename = " << occupancy_map_filename_);
+    ROS_INFO_STREAM("depth_of_interest_min = " << depth_of_interest_min_);
+    ROS_INFO_STREAM("depth_of_interest_max = " << depth_of_interest_max_);
+    ROS_INFO_STREAM("height_of_interest_min = " << height_of_interest_min_);
+    ROS_INFO_STREAM("height_of_interest_max = " << height_of_interest_max_);
 
 }
 
