@@ -255,17 +255,39 @@ void slam_event_handler::module_output_ready(rs::core::video_module_interface *s
     if (status >= 0 && count > 0)
     {
 
+      // Map orientation note (also applies to pose, which was processed above)
+      // Realsense Camera orientation (from https://software.intel.com/sites/products/realsense/slam/classrs_1_1slam_1_1PoseMatrix4f.html)
+      //   x: is positive in right direction with respect to the camera.
+      //   y: is positive in down direction with respect to the camera.
+      //   z: is positive away from the camera in [facing towards world].
+      //
+      // ROS orientation (from http://wiki.ros.org/rviz/DisplayTypes/Axes)
+      //   x: forward/backward, positive forward
+      //   y: left/right, positive left
+      //   z: up/down, positive up
+      //
+      // Which means, to map from Realsense to ROS:
+      // ROS  Camera
+      // Rx =  Cz
+      // Ry = -Cx
+      // Rz = -Cy  
+      //
+      // Which was done properly for pose, and also needs to be done for mapping,
+      // otherwise the odometery, point cloud, and map won't align.
+
       const int32_t* map = occ_map->get_tile_coordinates();
       for (int i = 0; i < count; i++)
       {
-        int _x = map[3 * i] + wmap / 2;
+        int _x = wmap / 2 - map[3 * i]; //  *see note above... flipping, was map[3 * i] + wmap / 2
+        //int _x = map[3 * i] + wmap / 2;
         int _y = map[3 * i + 1] + hmap / 2;
         if (_x >= 0 && _x < wmap)
         {
           if (_y >= 0 && _y < hmap)
           {
             int V = map[3 * i + 2];
-            ipNavMap->imageData[wmap * _y + _x] = V;
+            ipNavMap->imageData[wmap * _x + _y] = V;  // *see note above... was wmap* _y + _x, swapping (was there already a bug?)
+            //ipNavMap->imageData[wmap * _y + _x] = V;
           }
         }
       }
@@ -276,6 +298,9 @@ void slam_event_handler::module_output_ready(rs::core::video_module_interface *s
     map_msg.info.width      = wmap;
     map_msg.info.height     = hmap;
     map_msg.info.origin.position.x = -(wmap / 2) * slam->get_occupancy_map_resolution();
+    if (map_origin_center_) {
+        map_msg.info.origin.position.y = -(hmap / 2) * slam->get_occupancy_map_resolution();
+    }
     //christiaan: added stamp and frame_id to map msg
     map_msg.header.stamp = ros::Time::now();
     map_msg.header.frame_id = "/map";         

@@ -106,11 +106,13 @@ public:
   std::string origin_frame_id_;
   int map_width_;
   int map_height_;
+  bool map_origin_center_;
 
   const std::string Default_camera_frame_id_ = "camera_link";
   const std::string Default_origin_frame_id_ = "base_link";
   const int Default_map_width_ = 1024;
   const int Default_map_height_ = 1024;
+  const bool Default_map_origin_center_ = true;
 
   slam_event_handler(ros::NodeHandle &n) : nodeHandle_(n), loopRate(10)
   {
@@ -124,11 +126,13 @@ public:
     n.param("origin_frame_id", origin_frame_id_, Default_origin_frame_id_);
     n.param("map_width", map_width_, Default_map_width_);
     n.param("map_height", map_height_, Default_map_height_);
+    n.param("map_origin_center", map_origin_center_, Default_map_origin_center_);
 
     ROS_INFO_STREAM("camera_frame_id = " << camera_frame_id_);
     ROS_INFO_STREAM("origin_frame_id = " << origin_frame_id_);
     ROS_INFO_STREAM("map_width = " << map_width_);
     ROS_INFO_STREAM("map_height = " << map_height_);
+    ROS_INFO_STREAM("map_origin_center = " << (map_origin_center_ ? "true" : "false"));
 
     occPublisher = n.advertise<nav_msgs::OccupancyGrid>("/map",1);  
     
