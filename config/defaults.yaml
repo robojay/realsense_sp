@@ -5,6 +5,7 @@ map_height: 512
 map_origin_center: true
 relocalization_map_filename: "~/relocalization.map"
 occupancy_map_filename: "~/occupancy.map"
+trajectory_map_filename: "~/trajectory.ppm"
 depth_of_interest_min: 0.2
 depth_of_interest_max: 4.0
 height_of_interest_min: -0.1

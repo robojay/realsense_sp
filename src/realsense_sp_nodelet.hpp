@@ -61,6 +61,8 @@
 #include <realsense_sp/Status.h>
 #include <realsense_sp/Reset.h>
 #include <realsense_camera/SamplingData.h>
+#include <realsense_sp/SaveOutput.h>
+
 //namespace RSCore = rs::core;
 
 namespace realsense_sp
@@ -107,16 +109,20 @@ public:
   int map_width_;
   int map_height_;
   bool map_origin_center_;
+  std::string relocalization_map_in_filename_;
+  std::string occupancy_map_in_filename_;
 
   const std::string Default_camera_frame_id_ = "camera_link";
   const std::string Default_origin_frame_id_ = "base_link";
   const int Default_map_width_ = 1024;
   const int Default_map_height_ = 1024;
   const bool Default_map_origin_center_ = true;
+  const std::string Default_relocalization_map_in_filename_ = "relocalization_in.map";
+  const std::string Default_occupancy_map_in_filename_ = "occupancy_in.map";
 
   slam_event_handler(ros::NodeHandle &n) : nodeHandle_(n), loopRate(10)
   {
-    std::cout << "created.........." << std::endl;
+    ROS_INFO("created..........");
     odomPublisher = n.advertise<nav_msgs::Odometry>("/realsense/odom",1);  
     statusPublisher = n.advertise<realsense_sp::Status>("/realsense/slam/status",1);  
     
@@ -127,12 +133,16 @@ public:
     n.param("map_width", map_width_, Default_map_width_);
     n.param("map_height", map_height_, Default_map_height_);
     n.param("map_origin_center", map_origin_center_, Default_map_origin_center_);
+    n.param("occupancy_map_in_filename", occupancy_map_in_filename_, Default_occupancy_map_in_filename_);
+    n.param("relocalization_map_in_filename", relocalization_map_in_filename_, Default_relocalization_map_in_filename_);
 
     ROS_INFO_STREAM("camera_frame_id = " << camera_frame_id_);
     ROS_INFO_STREAM("origin_frame_id = " << origin_frame_id_);
     ROS_INFO_STREAM("map_width = " << map_width_);
     ROS_INFO_STREAM("map_height = " << map_height_);
     ROS_INFO_STREAM("map_origin_center = " << (map_origin_center_ ? "true" : "false"));
+    ROS_INFO_STREAM("occupancy_map_in_filename" << occupancy_map_in_filename_);
+    ROS_INFO_STREAM("relocalization_map_in_filename" << relocalization_map_in_filename_);
 
     occPublisher = n.advertise<nav_msgs::OccupancyGrid>("/map",1);  
     
@@ -158,6 +168,7 @@ protected:
   ros::NodeHandle pnh_;
   std::string nodelet_name_;
   ros::ServiceServer resetClient;
+  ros::ServiceServer saveData;
   ros::ServiceClient imu_info_client_;
   std::unique_ptr<rs::slam::slam> slam_;
   slam_event_handler *scenePerceptionEventHandler;
@@ -171,11 +182,15 @@ protected:
   std::shared_ptr<message_filters::Subscriber<realsense_camera::SamplingData>>  fisheye_sampling_sub_, depth_sampling_sub_;
   bool ready_;
 
+  std::shared_ptr<rs::slam::occupancy_map> occ_map;
+
+
   // parameters
   bool enable_relocalization_;
   double map_resolution_;
-  std::string relocalization_map_filename_;
-  std::string occupancy_map_filename_;
+  std::string relocalization_map_out_filename_;
+  std::string occupancy_map_out_filename_;
+  std::string trajectory_map_out_filename_;
   float depth_of_interest_min_;
   float depth_of_interest_max_;
   float height_of_interest_min_;
@@ -184,8 +199,9 @@ protected:
 
   const bool Default_enable_relocalization_ = true;
   const double Default_map_resolution_ = 0.2;
-  const std::string Default_relocalization_map_filename_ = "~/relocalization.map";
-  const std::string Default_occupancy_map_filename_ = "~/occupancy.map";
+  const std::string Default_relocalization_map_out_filename_ = "relocalization_out.map";
+  const std::string Default_occupancy_map_out_filename_ = "occupancy_out.map";
+  const std::string Default_trajectory_map_out_filename_ = "trajectory_out.ppm";
   const float Default_depth_of_interest_min_ = 0.3;
   const float Default_depth_of_interest_max_ = 3.0;
   const float Default_height_of_interest_min_ = -0.1;
@@ -219,6 +235,7 @@ protected:
   void printConfig(rs::core::video_module_interface::actual_module_config &slam_config);
   rs::core::image_interface *rosImageToRSImage(const sensor_msgs::ImageConstPtr &image, rs::core::stream_type stream,const realsense_camera::SamplingDataConstPtr& sampling_data );
   bool reset(realsense_sp::Reset::Request & req,realsense_sp::Reset::Response & res);
+  bool save(realsense_sp::SaveOutput::Request & req,realsense_sp::SaveOutput::Response & res);
   std::mutex mut_depth, mut_fisheye, mut_imu;
   // void getImageIntrinsics(const sensor_msgs::CameraInfoConstPtr& caminfo, RSCore::intrinsics& intrinsics);
   //void getImageExtrinsics(const sensor_msgs::CameraInfoConstPtr& caminfo, RSCore::extrinsics& extrinsics);

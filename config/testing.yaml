@@ -3,8 +3,12 @@ map_resolution: 0.1
 map_width: 512
 map_height: 512
 map_origin_center: true
-relocalization_map_filename: "~/relocalization.map"
-occupancy_map_filename: "~/occupancy.map"
+relocalization_map_out_filename: "/home/euclid/relocalization_out.map"
+occupancy_map_out_filename: "/home/euclid/occupancy_out.map"
+trajectory_map_out_filename: "/home/euclid/trajectory_out.ppm"
+relocalization_map_in_filename: "/home/euclid/relocalization_in.map"
+occupancy_map_in_filename: "/home/euclid/occupancy_in.map"
+trajectory_map_in_filename: "/home/euclid/trajectory_in.ppm"
 depth_of_interest_min: 0.2
 depth_of_interest_max: 4.0
 height_of_interest_min: -0.1

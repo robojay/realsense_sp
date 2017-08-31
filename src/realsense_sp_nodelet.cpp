@@ -37,7 +37,7 @@ PLUGINLIB_EXPORT_CLASS(realsense_sp::SPNodelet, nodelet::Nodelet)
 namespace realsense_sp
 {
 
-/*
+  /*
    * Nodelet constructor.
    */
 
@@ -149,7 +149,7 @@ void slam_event_handler::module_output_ready(rs::core::video_module_interface *s
 
   if(relocated)
   {
-    std::cout << "relocation happend" << std::endl;
+    ROS_INFO("relocation happend");
 
   geometry_msgs::TransformStamped reloc_trans;
   reloc_trans.header.stamp = ros::Time::now();
@@ -170,12 +170,11 @@ void slam_event_handler::module_output_ready(rs::core::video_module_interface *s
 
   br.sendTransform(reloc_trans);
 
-  std::cout << " m_data[0]  "  << relocPose.m_data[0] << " m_data[1], " <<  relocPose.m_data[1] 
+  ROS_INFO_STREAM(" m_data[0]  "  << relocPose.m_data[0] << " m_data[1], " <<  relocPose.m_data[1] 
        << " m_data[2], "  << relocPose.m_data[2] << " m_data[3], " <<  relocPose.m_data[3]  << " m_data[4], " <<  relocPose.m_data[4] 
        << " m_data[5], "  << relocPose.m_data[5] << " m_data[6], " <<  relocPose.m_data[6]  << " m_data[7], " <<  relocPose.m_data[7]
        << " m_data[8], "  << relocPose.m_data[8] << " m_data[9], " <<  relocPose.m_data[9]
-       << " m_data[10], " << relocPose.m_data[10] << " m_data[11], " << relocPose.m_data[11]
-       << std::endl;
+       << " m_data[10], " << relocPose.m_data[10] << " m_data[11], " << relocPose.m_data[11]);
 
   }
 
@@ -242,7 +241,15 @@ void slam_event_handler::module_output_ready(rs::core::video_module_interface *s
     if (!occ_map)
     {
       occ_map = slam->create_occupancy_map(wmap * hmap);
-      std::cout << " creating occupancy map: resolution: " << slam->get_occupancy_map_resolution() << std::endl;
+      ROS_INFO_STREAM(" creating occupancy map: resolution: " << slam->get_occupancy_map_resolution());
+
+      // testing...
+      int status = slam->load_occupancy_map(occupancy_map_in_filename_);
+      ROS_INFO_STREAM(" loading occupancy map " << status);
+      status = slam->load_relocalization_map(relocalization_map_in_filename_);
+      ROS_INFO_STREAM(" loading relocalization map " << status);
+
+
     }
     if (ipNavMap == NULL)
     {
@@ -335,6 +342,7 @@ SPNodelet::SPNodelet()
 {
 
 resetClient = nh_.advertiseService("/realsense/slam/reset",&SPNodelet::reset,this);
+saveData = nh_.advertiseService("/realsense/slam/save",&SPNodelet::save,this);
 
 }
 /*
@@ -360,7 +368,7 @@ void SPNodelet::onInit()
   actual_config.device_info.rotation = rs::core::rotation::rotation_0_degree;
   scenePerceptionEventHandler = new slam_event_handler(getPrivateNodeHandle());
   subscribeToCamInfoTopics();
-  subscribeToCameraStreams();
+  subscribeToCameraStreams();  
 }
 
 /*
@@ -406,6 +414,54 @@ bool SPNodelet::reset(realsense_sp::Reset::Request & req,realsense_sp::Reset::Re
     slam_->restart();
     return true;
 }
+
+
+bool SPNodelet::save(realsense_sp::SaveOutput::Request &req, realsense_sp::SaveOutput::Response &resp)
+{
+  bool success = true;
+  rs::core::status result;
+
+  // result codes https://sotware.intel.com/sites/products/realsense/sdk/status_8h_source.html
+
+
+  result = slam_->save_occupancy_map_as_ppm(trajectory_map_out_filename_, true);
+  if (result == rs::core::status::status_no_error)
+  {
+    ROS_INFO("Saved trajectory to PPM file.");
+  }
+  else
+  {
+    ROS_ERROR_STREAM("FAILED to save trajectory to PPM file. " << result);
+    success = false;
+  }
+  
+  result = slam_->save_occupancy_map(occupancy_map_out_filename_);
+  if(result == rs::core::status::status_no_error)
+  {
+    ROS_INFO("Saved occupancy map to BIN file.");
+  }
+  else
+  {
+    ROS_ERROR_STREAM("FAILED to save occupancy map to BIN file. " << result);
+    success = false;
+  }
+  
+  result = slam_->save_relocalization_map(relocalization_map_out_filename_);
+  if(result == rs::core::status::status_no_error)
+  {
+    ROS_INFO("Saved relocalization map to BIN file.");
+  }
+  else
+  {
+    ROS_ERROR_STREAM("FAILED to save relocalization map to BIN file. " << result);
+    success = false;
+  }
+  
+  resp.status = success;
+  return true;  
+}
+
+
 void SPNodelet::depthMessageCallback(const sensor_msgs::ImageConstPtr &depthImageMsg, const realsense_camera::SamplingDataConstPtr& sampling_data )
 {
 
@@ -588,8 +644,9 @@ void SPNodelet::getParameters() {
    
     pnh_.param("enable_relocalization", enable_relocalization_, Default_enable_relocalization_);
     pnh_.param("map_resolution", map_resolution_, Default_map_resolution_);
-    pnh_.param("relocalization_map_filename", relocalization_map_filename_, Default_relocalization_map_filename_);
-    pnh_.param("occupancy_map_filename", occupancy_map_filename_, Default_occupancy_map_filename_);
+    pnh_.param("relocalization_map_out_filename", relocalization_map_out_filename_, Default_relocalization_map_out_filename_);
+    pnh_.param("occupancy_map_out_filename", occupancy_map_out_filename_, Default_occupancy_map_out_filename_);
+    pnh_.param("trajectory_map_out_filename", trajectory_map_out_filename_, Default_trajectory_map_out_filename_);
     pnh_.param("depth_of_interest_min", depth_of_interest_min_, Default_depth_of_interest_min_);
     pnh_.param("depth_of_interest_max", depth_of_interest_max_, Default_depth_of_interest_max_);
     pnh_.param("height_of_interest_min", height_of_interest_min_, Default_height_of_interest_min_);
@@ -597,8 +654,9 @@ void SPNodelet::getParameters() {
 
     ROS_INFO_STREAM("enable_relocalization = " << (enable_relocalization_ ? std::string("true") : std::string("false")));
     ROS_INFO_STREAM("map_resolution = " << map_resolution_);
-    ROS_INFO_STREAM("relocalization_map_filename = " << relocalization_map_filename_);
-    ROS_INFO_STREAM("occupancy_map_filename = " << occupancy_map_filename_);
+    ROS_INFO_STREAM("relocalization_map_out_filename = " << relocalization_map_out_filename_);
+    ROS_INFO_STREAM("occupancy_map_out_filename = " << occupancy_map_out_filename_);
+    ROS_INFO_STREAM("trajectory_map_out_filename = " << trajectory_map_out_filename_);
     ROS_INFO_STREAM("depth_of_interest_min = " << depth_of_interest_min_);
     ROS_INFO_STREAM("depth_of_interest_max = " << depth_of_interest_max_);
     ROS_INFO_STREAM("height_of_interest_min = " << height_of_interest_min_);
@@ -625,7 +683,7 @@ void SPNodelet::initializeSlam()
   supported_config = {};
   if (slam_->query_supported_module_config(0, supported_config) < rs::core::status_no_error)
   {
-    std::cerr << "error : failed to query the first supported module configuration" << std::endl;
+    ROS_ERROR("error : failed to query the first supported module configuration");
     return;
   }
   ROS_INFO("Done initializing slam nodelet");
@@ -638,13 +696,13 @@ void SPNodelet::initializeSlam()
 
   slam_->get_occupancy_map_height_of_interest(minHeight,maxHeight);
 
-  std::cout << "default height of interest min: " << minHeight << " max: " << maxHeight << std::endl;
+  ROS_INFO_STREAM("default height of interest min: " << minHeight << " max: " << maxHeight);
 
   slam_->set_occupancy_map_height_of_interest(height_of_interest_min_, height_of_interest_max_);
 
   slam_->get_occupancy_map_height_of_interest(minHeight,maxHeight);
 
-  std::cout << "custom height of interest min: " << minHeight << " max: " << maxHeight << std::endl;
+  ROS_INFO_STREAM("custom height of interest min: " << minHeight << " max: " << maxHeight);
   
   //christiaan: set the depth of interest (numbers are meter in reference to the front  of euclid)
 
@@ -653,21 +711,23 @@ void SPNodelet::initializeSlam()
 
   slam_->get_occupancy_map_depth_of_interest(minDepth,maxDepth);
 
-  std::cout << "default depth of interest min: " << minDepth << " max: " << maxDepth << std::endl;
+  ROS_INFO_STREAM("default depth of interest min: " << minDepth << " max: " << maxDepth);
 
   slam_->set_occupancy_map_depth_of_interest(depth_of_interest_min_, depth_of_interest_max_);
 
   slam_->get_occupancy_map_depth_of_interest(minDepth,maxDepth);
 
-  std::cout << "custom depth of interest max: " << minDepth << " max: " << maxDepth << std::endl;
+  ROS_INFO_STREAM("custom depth of interest max: " << minDepth << " max: " << maxDepth);
 
   //christiaan: set the resolution of the map (numbers are meter)
 
-  std::cout << "default map resolution: " << slam_->get_occupancy_map_resolution() << std::endl;
+  ROS_INFO_STREAM("default map resolution: " << slam_->get_occupancy_map_resolution());
 
  // slam_->set_occupancy_map_resolution(0.02);
 
 //  std::cout << "custom map resolution: " << slam_->get_occupancy_map_resolution() << std::endl; 
+
+
 }
 /*
    * Callback for Camera Info Topics.
@@ -728,7 +788,7 @@ void SPNodelet::caminfoCallback(const sensor_msgs::CameraInfoConstPtr &fisheye_c
     if ((code = slam_->set_module_config(actual_config)) < rs::core::status_no_error)
     {
       NODELET_ERROR("error : failed to set the enabled module configuration: ");
-      std::cout << "code: " << code << std::endl;
+      ROS_ERROR_STREAM("code: " << code);
       return;
     }
     ready_ = true;
@@ -744,67 +804,66 @@ void SPNodelet::printConfig(rs::core::video_module_interface::actual_module_conf
 {
   for (auto &stream : {rs::core::stream_type::fisheye, rs::core::stream_type::depth})
   {
-    std::cout << "width: " << actual_config[stream].size.width << std::endl;
-    std::cout << "height: " << actual_config[stream].size.height << std::endl;
-    std::cout << "fps: " << actual_config[stream].frame_rate << std::endl;
-    std::cout << "is_enabled: " << actual_config[stream].is_enabled << std::endl;
+    ROS_INFO_STREAM("width: " << actual_config[stream].size.width);
+    ROS_INFO_STREAM("height: " << actual_config[stream].size.height);
+    ROS_INFO_STREAM("fps: " << actual_config[stream].frame_rate);
+    ROS_INFO_STREAM("is_enabled: " << actual_config[stream].is_enabled);
 
-    std::cout << "width: " << actual_config[stream].intrinsics.width << std::endl;
-    std::cout << "height: " << actual_config[stream].intrinsics.height << std::endl;
+    ROS_INFO_STREAM("width: " << actual_config[stream].intrinsics.width);
+    ROS_INFO_STREAM("height: " << actual_config[stream].intrinsics.height);
 
-    std::cout << "fx: " << actual_config[stream].intrinsics.fx << std::endl;
-    std::cout << "fy: " << actual_config[stream].intrinsics.fy << std::endl;
-    std::cout << "ppx: " << actual_config[stream].intrinsics.ppx << std::endl;
-    std::cout << "ppy: " << actual_config[stream].intrinsics.ppy << std::endl;
+    ROS_INFO_STREAM("fx: " << actual_config[stream].intrinsics.fx);
+    ROS_INFO_STREAM("fy: " << actual_config[stream].intrinsics.fy);
+    ROS_INFO_STREAM("ppx: " << actual_config[stream].intrinsics.ppx);
+    ROS_INFO_STREAM("ppy: " << actual_config[stream].intrinsics.ppy);
     for (int i = 0; i < 5; i++)
     {
-
-      std::cout << "coeffs[" << i << "]=" << actual_config[stream].intrinsics.coeffs[i] << std::endl;
+        ROS_INFO_STREAM("coeffs[" << i << "]=" << actual_config[stream].intrinsics.coeffs[i]);
     }
   }
-  std::cout << "======= Motion:" << std::endl;
-  std::cout << "accel_sample_rate: " << actual_config[rs::core::motion_type::accel].sample_rate << std::endl;
-  std::cout << "gyro_sample_rate: " << actual_config[rs::core::motion_type::gyro].sample_rate << std::endl;
-  std::cout << "Extrinsic - fisheye to motion" << std::endl;
+  ROS_INFO_STREAM("======= Motion:");
+  ROS_INFO_STREAM("accel_sample_rate: " << actual_config[rs::core::motion_type::accel].sample_rate);
+  ROS_INFO_STREAM("gyro_sample_rate: " << actual_config[rs::core::motion_type::gyro].sample_rate);
+  ROS_INFO_STREAM("Extrinsic - fisheye to motion");
   for (int i = 0; i < 9; ++i)
   {
-    std::cout << "Rotation: " << actual_config[rs::core::stream_type::fisheye].extrinsics_motion.rotation[i] << std::endl;
+    ROS_INFO_STREAM("Rotation: " << actual_config[rs::core::stream_type::fisheye].extrinsics_motion.rotation[i]);
   }
   for (int i = 0; i < 3; ++i)
   {
-    std::cout << "translation: " << actual_config[rs::core::stream_type::fisheye].extrinsics_motion.translation[i] << std::endl;
+    ROS_INFO_STREAM("translation: " << actual_config[rs::core::stream_type::fisheye].extrinsics_motion.translation[i]);
   }
-  std::cout << "Extrinsic - fisheye to depth" << std::endl;
+    ROS_INFO_STREAM("Extrinsic - fisheye to depth");
   for (int i = 0; i < 9; ++i)
   {
-    std::cout << "Rotation: " << actual_config[rs::core::stream_type::fisheye].extrinsics.rotation[i] << std::endl;
+    ROS_INFO_STREAM("Rotation: " << actual_config[rs::core::stream_type::fisheye].extrinsics.rotation[i]);
   }
   for (int i = 0; i < 3; ++i)
   {
-    std::cout << "translation: " << actual_config[rs::core::stream_type::fisheye].extrinsics.translation[i] << std::endl;
+    ROS_INFO_STREAM("translation: " << actual_config[rs::core::stream_type::fisheye].extrinsics.translation[i]);
   }
 
-  std::cout << "Motion intrinsic" << std::endl;
+  ROS_INFO_STREAM("Motion intrinsic");
 
   for (auto &motion : {rs::core::motion_type::gyro, rs::core::motion_type::accel})
   {
-    std::cout << "data" << std::endl;
+    ROS_INFO_STREAM("data");
     for (int i = 0; i < 3; ++i)
     {
       for (int j = 0; j < 4; ++j)
       {
-        std::cout << "Intrinsic: " << actual_config[motion].intrinsics.data[i][j] << std::endl;
+        ROS_INFO_STREAM("Intrinsic: " << actual_config[motion].intrinsics.data[i][j]);
       }
     }
     for (int i = 0; i < 3; ++i)
     {
 
-      std::cout << "noise: " << actual_config[motion].intrinsics.noise_variances[i] << std::endl;
+      ROS_INFO_STREAM("noise: " << actual_config[motion].intrinsics.noise_variances[i]);
     }
     for (int i = 0; i < 3; ++i)
     {
 
-      std::cout << "bias: " << actual_config[motion].intrinsics.bias_variances[i] << std::endl;
+      ROS_INFO_STREAM("bias: " << actual_config[motion].intrinsics.bias_variances[i]);
     }
   }
 }
@@ -813,3 +872,9 @@ void SPNodelet::printConfig(rs::core::video_module_interface::actual_module_conf
 
 
 
+//
+// Need to add load mechanism
+//
+// trick is that event handler class doesn't have access to filenames
+// is slam_ in the nodelet the same as slam in the event handler?
+//
